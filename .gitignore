@@ -3,3 +3,6 @@ dist/
 *.zip
 *.spec
 build/
+
+# Ignorar o script de instalação do Inno Setup
+install_script.iss
