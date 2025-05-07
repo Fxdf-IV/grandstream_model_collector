@@ -1,5 +1,4 @@
 dist/
-*.exe
 *.zip
 *.spec
 build/
