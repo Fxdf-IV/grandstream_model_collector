@@ -3,5 +3,16 @@ dist/
 *.spec
 build/
 
+# Ignore Python embeddable package
+python-embed/
+
 # Ignorar o script de instalação do Inno Setup
 install_script.iss
+
+# Ignore Python cache files
+*.pyc
+__pycache__/
+
+# Ignore PyInstaller generated files
+xref-*.html
+warn-*.txt
