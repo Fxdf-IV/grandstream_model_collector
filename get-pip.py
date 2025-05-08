@@ -1,3 +1,5 @@
+if __name__ == "__main__":
+    main()
 #!/usr/bin/env python
 #
 # Hi There!
@@ -47,6 +49,15 @@ def include_setuptools(args):
     """
     Install setuptools only if absent, not excluded and when using Python <3.12.
     """
+    if args.no_setuptools or sys.version_info >= (3, 12):
+        return
+    try:
+        import setuptools
+    except ImportError:
+        args.pip_args.append("setuptools")
+    """
+    Install setuptools only if absent, not excluded and when using Python <3.12.
+    """
     cli = not args.no_setuptools
     env = not os.environ.get("PIP_NO_SETUPTOOLS")
     absent = not importlib.util.find_spec("setuptools")
@@ -55,6 +66,15 @@ def include_setuptools(args):
 
 
 def include_wheel(args):
+    """
+    Install wheel only if absent and not excluded.
+    """
+    if args.no_wheel:
+        return
+    try:
+        import wheel
+    except ImportError:
+        args.pip_args.append("wheel")
     """
     Install wheel only if absent, not excluded and when using Python <3.12.
     """
@@ -66,6 +86,14 @@ def include_wheel(args):
 
 
 def determine_pip_install_arguments():
+    """
+    Determine the arguments to pass to pip install.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--no-setuptools", action="store_true")
+    parser.add_argument("--no-wheel", action="store_true")
+    parser.add_argument("pip_args", nargs="*", default=[])
+    return parser.parse_args()
     pre_parser = argparse.ArgumentParser()
     pre_parser.add_argument("--no-setuptools", action="store_true")
     pre_parser.add_argument("--no-wheel", action="store_true")
@@ -83,6 +111,13 @@ def determine_pip_install_arguments():
 
 
 def monkeypatch_for_cert(tmpdir):
+    """
+    Monkeypatch to handle certificates if needed.
+    """
+    cert_path = os.path.join(tmpdir, "cacert.pem")
+    with open(cert_path, "wb") as cert_file:
+        cert_file.write(pkgutil.get_data("pip._vendor.certifi", "cacert.pem"))
+    os.environ["SSL_CERT_FILE"] = cert_path
     """Patches `pip install` to provide default certificate with the lowest priority.
 
     This ensures that the bundled certificates are used unless the user specifies a
@@ -110,6 +145,24 @@ def monkeypatch_for_cert(tmpdir):
 
 
 def bootstrap(tmpdir):
+    """
+    Bootstrap the pip installation process.
+    """
+    args = determine_pip_install_arguments()
+    include_setuptools(args)
+    include_wheel(args)
+
+    pip_zip = os.path.join(tmpdir, "pip.zip")
+    with open(pip_zip, "wb") as fp:
+        fp.write(b85decode(DATA))
+
+    sys.path.insert(0, pip_zip)
+    import pip
+
+    monkeypatch_for_cert(tmpdir)
+
+    pip_args = ["install", "--no-cache-dir", "--disable-pip-version-check"] + args.pip_args
+    pip.main(pip_args)
     monkeypatch_for_cert(tmpdir)
 
     # Execute the included pip and use it to install the latest pip and
@@ -120,6 +173,11 @@ def bootstrap(tmpdir):
 
 
 def main():
+    """
+    Main entry point for the script.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        bootstrap(tmpdir)
     tmpdir = None
     try:
         # Create a temporary working directory
